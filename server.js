@@ -143,6 +143,8 @@ app.get('/admin', async (req, res) => {
 
 app.post('/login', (req, res) => {
     const { ID, password } = req.body;
+    console.log("id : ", ID);
+    console.log("Password : ", password);
     if (!ID || !password) {
         return res.status(401).json({ message: "Invalid Credentials" });
     }
