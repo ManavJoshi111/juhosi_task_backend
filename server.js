@@ -1,167 +1,163 @@
 const express = require('express');
 const app = express();
 const cors = require('cors');
+const fs = require('fs');
 const dotenv = require('dotenv');
 const connection = require('./db');
+const createCsvWriter = require('csv-writer').createObjectCsvWriter;
 dotenv.config();
 const PORT = process.env.PORT || 8000;
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-const validateDate = (date) => {
-    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-    return dateRegex.test(date);
-};
-
-const validateAlphaNumeric = (text) => {
-    const alphaNumericRegex = /^[a-zA-Z0-9\s]+$/;
-    return alphaNumericRegex.test(text);
-};
-
-const validateString = (text) => {
-    return typeof text === 'string' && text.trim() !== '';
-};
-
-const validateInteger = (number) => {
-    const parsedNumber = parseInt(number, 10);
-    return !isNaN(parsedNumber) && Number.isInteger(parsedNumber);
-};
-
-const validateFloat = (number) => {
-    const parsedNumber = parseFloat(number);
-    return !isNaN(parsedNumber) && typeof parsedNumber === 'number';
-};
-
-
-app.post('/customer', (req, res) => {
-    const { ID, orderdate, company, owner, item, quantity, weight, request_for_shipment, tracking_id, shipment_size, box_count, specification, checklist_quantity } = req.body;
-    if (!validateDate(orderdate)) {
-        return res.status(400).json({ error: 'Invalid order date' });
-    }
-
-    if (!validateAlphaNumeric(company)) {
-        return res.status(400).json({ error: 'Invalid company name' });
-    }
-
-    if (!validateAlphaNumeric(owner)) {
-        return res.status(400).json({ error: 'Invalid owner name' });
-    }
-
-    if (!validateString(item)) {
-        return res.status(400).json({ error: 'Invalid item' });
-    }
-
-    if (!validateInteger(quantity)) {
-        return res.status(400).json({ error: 'Invalid quantity' });
-    }
-
-    if (!validateFloat(weight)) {
-        return res.status(400).json({ error: 'Invalid weight' });
-    }
-
-    if (!validateString(request_for_shipment)) {
-        return res.status(400).json({ error: 'Invalid request for shipment' });
-    }
-
-    if (!validateString(tracking_id)) {
-        return res.status(400).json({ error: 'Invalid tracking ID' });
-    }
-
-    if (!validateString(shipment_size)) {
-        return res.status(400).json({ error: 'Invalid shipment size' });
-    }
-
-    if (!validateInteger(box_count)) {
-        return res.status(400).json({ error: 'Invalid box count' });
-    }
-
-    if (!validateString(specification)) {
-        return res.status(400).json({ error: 'Invalid specification' });
-    }
-
-    if (!validateString(checklist_quantity)) {
-        return res.status(400).json({ error: 'Invalid checklist quantity' });
-    }
-
-    const query = connection.query("INSERT INTO customer (ID,orderdate, company, owner, item, quantity, weight, request_for_shipment, tracking_id, shipment_size, box_count, specification, checklist_quantity) VALUES (?,?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [ID, orderdate, company, owner, item, quantity, weight, request_for_shipment, tracking_id, shipment_size, box_count, specification, checklist_quantity], (err, result) => {
-        if (err) {
-            console.log(err);
-            return res.status(500).json({ message: "Internal Server Error" });
-        }
-        else {
-            console.log(result);
-            return res.status(200).json({ message: "Customer added successfully" });
-        }
-    });
-});
-
-app.get('/admin', async (req, res) => {
-    const query1 = "SELECT  sum(quantity) as quantity,sum(weight) as weight,sum(box_count) as box_count FROM customer where ID='customer1'";
-    const query2 = "SELECT  sum(quantity) as quantity,sum(weight) as weight, sum(box_count) as box_count FROM customer where ID='customer2'";
-    const query3 = "SELECT sum(quantity) as quantity,sum(weight) as weight,sum(box_count) as box_count FROM customer";
-    let data = {
-        customer1: [],
-        customer2: [],
-        total: []
-    };
-    let query = await connection.query(query1, (err, result) => {
-        if (err) {
-            console.log(err);
-            return res.status(500).json({ message: "Internal Server Error" });
-        }
-        else {
-            data.customer1.push(result[0].quantity);
-            data.customer1.push(result[0].weight);
-            data.customer1.push(result[0].box_count);
-        }
-    });
-    query = await connection.query(query2, (err, result) => {
-        if (err) {
-            console.log(err);
-            return res.status(500).json({ message: "Internal Server Error" });
-        }
-        else {
-            data.customer2.push(result[0].quantity);
-            data.customer2.push(result[0].weight);
-            data.customer2.push(result[0].box_count);
-        }
-    });
-    query = await connection.query(query3, (err, result) => {
-        if (err) {
-            console.log(err);
-            return res.status(500).json({ message: "Internal Server Error" });
-        }
-        else {
-            data.total.push(result[0].quantity);
-            data.total.push(result[0].weight);
-            data.total.push(result[0].box_count);
-            return res.status(200).json({ data });
-        }
-    });
-});
-
 app.post('/login', (req, res) => {
     const { ID, password } = req.body;
     console.log("id : ", ID);
     console.log("Password : ", password);
     if (!ID || !password) {
-        return res.status(401).json({ message: "Invalid Credentials" });
+        return res.status(401).json({ error: "Invalid Credentials" });
     }
-    if (password != process.env.PASSWORD) {
-        return res.status(401).json({ message: "Invalid Credentials" });
-    }
-    if (ID == "admin") {
-        return res.status(200).json({ admin: 1 });
-    }
-    else {
-        if (ID == "customer1" || ID == "customer2") {
-            return res.status(200).json({ admin: 0 });
+    const query = "SELECT * FROM login WHERE ID = ? AND password = ?";
+    connection.query(query, [ID, password], (err, result) => {
+        if (err) {
+            console.log(err);
+            return res.status(500).json({ error: "Internal Server Error" });
         }
-        else {
-            return res.status(401).json({ message: "Invalid Credentials" });
+        if (result.length === 0) {
+            return res.status(401).json({ error: "Invalid Credentials" });
         }
+        return res.status(200).json({ message: "Login Successful" });
+    });
+});
+
+app.post('/changepassword', async (req, res) => {
+    console.log("Body : ", req.body);
+    const { id, mobile, newPassword, confirmNewPassword } = req.body;
+    if (!mobile || !newPassword || !confirmNewPassword) {
+        return res.status(401).json({ error: "Invalid Credentials" });
     }
+    if (newPassword !== confirmNewPassword) {
+        return res.status(401).json({ error: "Password Mismatch" });
+    }
+
+    let query = "UPDATE users SET password = ? WHERE mobile = ?";
+    connection.query(query, [newPassword, mobile], (err, result) => {
+        if (err) {
+            console.log(err);
+            return res.status(500).json({ error: "Invalid Credentials" });
+        }
+        else if (result.affectedRows === 0) {
+            return res.status(401).json({ error: "Invalid Credentials" });
+        }
+        query = "UPDATE login SET password=? WHERE id=?";
+        connection.query(query, [newPassword, id], (err, result) => {
+            if (err) {
+                console.log(err);
+                return res.status(500).json({ error: "Internal Server Error" });
+            }
+            if (result.affectedRows === 0) {
+                return res.status(401).json({ error: "Invalid Credentials" });
+            }
+            return res.status(200).json({ message: "Password Updated Successfully" });
+        });
+    });
+});
+
+app.get('/details/:id', (req, res) => {
+    const id = req.params.id;
+    console.log("Id : ", id);
+    const query = "SELECT id,name FROM users WHERE id = ?";
+    connection.query(query, [id], (err, result) => {
+        if (err) {
+            console.log(err);
+            return res.status(500).json({ error: "Internal Server Error" });
+        }
+        if (result.length === 0) {
+            return res.status(401).json({ error: "Invalid Credentials" });
+        }
+        return res.status(200).json(result[0]);
+    });
+})
+
+app.post('/details', (req, res) => {
+    const { order_date, item, count, weight, requests } = req.body;
+    let query = "INSERT INTO Orderitem(order_date,item,count,weight,requests) VALUES(?,?,?,?,?)";
+    let orderId;
+    connection.query(query, [order_date, item, count, weight, requests], (err, result) => {
+        if (err) {
+            console.log(err);
+            return res.status(500).json({ error: "Internal Server Error" });
+        }
+        orderId = result.insertId;
+        query = "INSERT INTO Orderinfo VALUES(?,?,?)";
+        connection.query(query, [null, orderId, req.body.company], (err, result) => {
+            console.log(query.sql);
+            if (err) {
+                console.log(err);
+            }
+        });
+        return res.status(200).json({ message: "Order Placed Successfully" });
+    });
+});
+
+app.get('/data/:id', (req, res) => {
+    const { id } = req.params;
+    const query = "select * from Orderitem where order_id in (select order_id from Orderinfo WHERE user_id=?)";
+    connection.query(query, [id], (err, result) => {
+        if (err) {
+            console.log(err);
+            return res.status(500).json({ error: "Internal Server Error" });
+        }
+        const subquery = "SELECT id,mobile,name from users where id=?";
+        connection.query(subquery, [id], (err, subresult) => {
+            if (err) {
+                console.log(err);
+                return res.status(500).json({ error: "Internal Server Error" });
+            }
+            result.push(subresult[0]);
+            return res.status(200).json(result);
+        });
+    });
+});
+
+app.get('/data/csv/:id', (req, res) => {
+    const { id } = req.params;
+    const query = "select * from Orderitem where order_id in (select order_id from Orderinfo WHERE user_id=?)";
+    connection.query(query, [id], (err, result) => {
+        if (err) {
+            console.log(err);
+            return res.status(500).json({ error: "Internal Server Error" });
+        }
+        const subquery = "SELECT id,mobile,name from users where id=?";
+        connection.query(subquery, [id], (err, subresult) => {
+            if (err) {
+                console.log(err);
+                return res.status(500).json({ error: "Internal Server Error" });
+            }
+            result.push(subresult[0]);
+        });
+        const csvWriter = createCsvWriter({
+            path: 'data.csv',
+            header: Object.keys(result[0]).map(column => ({
+                id: column,
+                title: column,
+            })),
+        });
+
+        csvWriter
+            .writeRecords(result)
+            .then(() => {
+                res.setHeader('Content-Type', 'text/csv');
+                res.setHeader('Content-Disposition', 'attachment; filename=data.csv');
+
+                fs.createReadStream('data.csv').pipe(res);
+            })
+            .catch(error => {
+                console.error(error);
+                return res.status(500).json({ error: 'Internal Server Error' });
+            });
+    });
 });
 
 app.listen(PORT, () => {

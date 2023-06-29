@@ -2,11 +2,11 @@ const mysql = require('mysql');
 const dotenv = require('dotenv');
 dotenv.config();
 const connection = mysql.createConnection({
-    host: "13.127.217.25",
+    host: "db4free.net",
     port: "3306",
-    user: "manav",
-    password: "root_manav@123",
-    database: "juhosi_task"
+    user: "juhosi",
+    password: "juhosi123",
+    database: "juhosi"
 });
 
 connection.connect((err) => {
